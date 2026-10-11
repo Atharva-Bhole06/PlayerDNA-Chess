@@ -1,0 +1,10 @@
+.env
+.env.*
+!.env.example
+frontend/.env
+frontend/.env.*
+!frontend/.env.example
+.venv/
+__pycache__/
+*.py[cod]
+artifacts/models/*.joblib

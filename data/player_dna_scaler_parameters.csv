@@ -1,0 +1,4 @@
+feature,median,q1,q3,iqr_scale,transformation
+median_cpl,70.68,51.9275,80.65375,28.72625,(value - median) / IQR
+cpl_std,29.39342450992804,27.09327004333741,36.611605176004076,9.518335132666667,(value - median) / IQR
+inaccuracies_per_100_cp_moves,22.89457765374324,21.77757311921088,24.138681450337263,2.361108331126381,(value - median) / IQR

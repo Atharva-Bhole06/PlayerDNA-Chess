@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="790" viewBox="0 0 1100 790">
+<rect width="100%" height="100%" fill="#ffffff"/>
+<text x="30" y="38" font-size="23" text-anchor="start" fill="#16324f">PCA view of Player DNA features</text>
+<text x="30" y="62" font-size="12" text-anchor="start" fill="#52606d">Visualization only; PC1 69.1%, PC2 20.9% variance</text>
+<line x1="100" y1="670" x2="1040" y2="670" stroke="#52606d"/>
+<line x1="100" y1="120" x2="100" y2="670" stroke="#52606d"/>
+<text x="570.0" y="720" font-size="14" text-anchor="middle" fill="#263238">PC1 (69.1%)</text>
+<text x="25" y="395.0" font-size="14" text-anchor="middle" fill="#263238" transform="rotate(-90 25 395.0)">PC2 (20.9%)</text>
+<circle cx="353.7" cy="616.8" r="5" fill="#2b6cb0"/>
+<text x="360.66721606767123" y="611.7741935483871" font-size="9" text-anchor="start" fill="#263238">aaaaaaaddd</text>
+<circle cx="706.6" cy="173.2" r="5" fill="#2b6cb0"/>
+<text x="713.5836253409685" y="168.22580645161287" font-size="9" text-anchor="start" fill="#263238">anastasia2009</text>
+<circle cx="605.3" cy="314.5" r="5" fill="#2b6cb0"/>
+<text x="612.3460594600474" y="309.471757867512" font-size="9" text-anchor="start" fill="#263238">bear789</text>
+<circle cx="623.4" cy="428.1" r="5" fill="#2b6cb0"/>
+<text x="630.4176107473849" y="423.06679706704085" font-size="9" text-anchor="start" fill="#263238">blazingdragon</text>
+<circle cx="420.2" cy="444.0" r="5" fill="#2b6cb0"/>
+<text x="427.20290126828183" y="438.98487637446965" font-size="9" text-anchor="start" fill="#263238">bleda</text>
+<circle cx="191.0" cy="325.5" r="5" fill="#2b6cb0"/>
+<text x="197.9677419354839" y="320.5414141459399" font-size="9" text-anchor="start" fill="#263238">bobc</text>
+<circle cx="578.2" cy="463.9" r="5" fill="#2b6cb0"/>
+<text x="585.2101134439224" y="458.87700583508797" font-size="9" text-anchor="start" fill="#263238">derspiegel</text>
+<circle cx="635.8" cy="310.7" r="5" fill="#2b6cb0"/>
+<text x="642.7557624417992" y="305.67765960490135" font-size="9" text-anchor="start" fill="#263238">dipset</text>
+<circle cx="396.8" cy="382.5" r="5" fill="#2b6cb0"/>
+<text x="403.76369148585076" y="377.4944716152526" font-size="9" text-anchor="start" fill="#263238">docboss</text>
+<circle cx="790.7" cy="598.5" r="5" fill="#2b6cb0"/>
+<text x="797.693387384186" y="593.5083425589348" font-size="9" text-anchor="start" fill="#263238">erikweisz</text>
+<circle cx="900.4" cy="286.9" r="5" fill="#2b6cb0"/>
+<text x="907.3501504876449" y="281.8699087072442" font-size="9" text-anchor="start" fill="#263238">fandm-lancaster</text>
+<circle cx="438.9" cy="208.8" r="5" fill="#2b6cb0"/>
+<text x="445.87877197178415" y="203.81167683726142" font-size="9" text-anchor="start" fill="#263238">gjdgjdfj</text>
+<circle cx="521.0" cy="280.5" r="5" fill="#2b6cb0"/>
+<text x="527.9820109472892" y="275.53610215438425" font-size="9" text-anchor="start" fill="#263238">islam01</text>
+<circle cx="456.1" cy="276.2" r="5" fill="#2b6cb0"/>
+<text x="463.09200619526746" y="271.1649946479877" font-size="9" text-anchor="start" fill="#263238">jdbarger</text>
+<circle cx="426.4" cy="349.7" r="5" fill="#2b6cb0"/>
+<text x="433.36390542826297" y="344.6740265607805" font-size="9" text-anchor="start" fill="#263238">jeffersondarcy1</text>
+<circle cx="363.3" cy="319.8" r="5" fill="#2b6cb0"/>
+<text x="370.3495998166281" y="314.83464561525415" font-size="9" text-anchor="start" fill="#263238">juncinmestrella</text>
+<circle cx="704.4" cy="240.0" r="5" fill="#2b6cb0"/>
+<text x="711.4003722251703" y="235.00994569562437" font-size="9" text-anchor="start" fill="#263238">kevchod</text>
+<circle cx="431.5" cy="361.5" r="5" fill="#2b6cb0"/>
+<text x="438.5302803702335" y="356.4987985115294" font-size="9" text-anchor="start" fill="#263238">khelil</text>
+<circle cx="533.6" cy="546.5" r="5" fill="#2b6cb0"/>
+<text x="540.5652060648542" y="541.4797390987138" font-size="9" text-anchor="start" fill="#263238">mukrisp</text>
+<circle cx="367.8" cy="384.3" r="5" fill="#2b6cb0"/>
+<text x="374.7731244513272" y="379.32521775327433" font-size="9" text-anchor="start" fill="#263238">pavelsps</text>
+<circle cx="460.4" cy="287.5" r="5" fill="#2b6cb0"/>
+<text x="467.4228964740181" y="282.4814470555899" font-size="9" text-anchor="start" fill="#263238">ri_chess</text>
+<circle cx="315.3" cy="289.9" r="5" fill="#2b6cb0"/>
+<text x="322.25607854588065" y="284.93228908300046" font-size="9" text-anchor="start" fill="#263238">robixy</text>
+<circle cx="411.3" cy="295.1" r="5" fill="#2b6cb0"/>
+<text x="418.26692014314017" y="290.13452862612905" font-size="9" text-anchor="start" fill="#263238">samoo1477</text>
+<circle cx="281.0" cy="460.2" r="5" fill="#2b6cb0"/>
+<text x="287.99677090653756" y="455.22645491258413" font-size="9" text-anchor="start" fill="#263238">ssf7</text>
+<circle cx="640.6" cy="451.1" r="5" fill="#2b6cb0"/>
+<text x="647.6212968595567" y="446.1277814966199" font-size="9" text-anchor="start" fill="#263238">taranga</text>
+<circle cx="949.0" cy="454.8" r="5" fill="#2b6cb0"/>
+<text x="956.0322580645161" y="449.78412983858084" font-size="9" text-anchor="start" fill="#263238">tetley</text>
+<circle cx="262.4" cy="442.2" r="5" fill="#2b6cb0"/>
+<text x="269.3912998693793" y="437.15925195552217" font-size="9" text-anchor="start" fill="#263238">thebadfish</text>
+<circle cx="508.7" cy="381.6" r="5" fill="#2b6cb0"/>
+<text x="515.7087612708756" y="376.63692258632693" font-size="9" text-anchor="start" fill="#263238">totonut</text>
+<circle cx="452.6" cy="366.4" r="5" fill="#2b6cb0"/>
+<text x="459.6390269862788" y="361.3897598597018" font-size="9" text-anchor="start" fill="#263238">vladimir-kramnik-1</text>
+<circle cx="505.1" cy="176.4" r="5" fill="#2b6cb0"/>
+<text x="512.0591902791739" y="171.4006961013539" font-size="9" text-anchor="start" fill="#263238">zapala</text>
+</svg>

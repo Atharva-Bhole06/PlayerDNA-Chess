@@ -1,0 +1,5 @@
+-r requirements-live-chess.txt
+pandas>=2.2
+numpy>=2.0
+pydantic>=2.8
+SQLAlchemy>=2.0

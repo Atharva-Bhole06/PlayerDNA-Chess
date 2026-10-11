@@ -1,0 +1,4 @@
+removed_feature,mean_top5_overlap_with_full,mean_full_ranking_spearman,players_with_identical_top5
+dna_median_cpl,3.2666666666666666,0.8964532019704432,3
+dna_cpl_std,2.933333333333333,0.76679802955665,1
+dna_inaccuracies_per_100_cp_moves,3.2666666666666666,0.7906075533661738,0
