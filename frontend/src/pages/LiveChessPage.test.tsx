@@ -1,6 +1,8 @@
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { MemoryRouter } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { LiveChessPage } from './LiveChessPage'
+import { AuthContext } from '../context/AuthContext'
 
 const initialFen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
 function health(stockfish_available = true) { return { status: 'ok', database_available: true, stockfish_available } }
@@ -114,5 +116,148 @@ describe('Live Chess & Analysis page', () => {
     expect(await screen.findByText('Black to move.')).toBeInTheDocument()
     await act(async () => resolveAnalysis(response(analysis())))
     expect(screen.queryByLabelText('Engine analysis result')).not.toBeInTheDocument()
+  })
+
+  it('triggers Stockfish response after player move in AI mode', async () => {
+    const fetchMock = mockApi(async () => response(analysis({
+      best_move: 'e7e5',
+      best_move_san: 'e5',
+    })))
+
+    render(<LiveChessPage />)
+    // Switch to AI mode via query parameter mock or direct URL
+    window.history.pushState({}, '', '/live-chess?mode=ai')
+    cleanup()
+
+    render(<LiveChessPage />)
+    expect(await screen.findByRole('heading', { name: 'Play Stockfish AI' })).toBeInTheDocument()
+
+    // Player moves e2 to e4
+    playMove('e2', 'e4')
+
+    // Expect Stockfish was queried for Black's move
+    await act(async () => {
+      await new Promise(r => setTimeout(r, 50))
+    })
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://localhost:8000/api/chess/recommend',
+      expect.objectContaining({ method: 'POST' })
+    )
+
+    // After AI move (e7e5), it should be White's turn again
+    expect(await screen.findByText('White to move.')).toBeInTheDocument()
+    window.history.pushState({}, '', '/')
+  })
+
+  it('renders Coach guidance panel and suggestions in Coach mode', async () => {
+    mockApi(async (_input, init) => {
+      const body = typeof init?.body === 'string' ? JSON.parse(init.body) : {}
+      const fen = body.fen || ''
+      if (fen.includes(' b ')) {
+        return response(analysis({
+          best_move: 'e7e5',
+          best_move_san: 'e5',
+          evaluation: -0.35,
+        }))
+      }
+      return response(analysis({
+        best_move: 'g1f3',
+        best_move_san: 'Nf3',
+        evaluation: 0.35,
+      }))
+    })
+
+    window.history.pushState({}, '', '/live-chess?mode=coach')
+    render(<LiveChessPage />)
+
+    expect(await screen.findByRole('heading', { name: 'Play with Coach' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Live Suggestions' })).toBeInTheDocument()
+
+    // Make a move
+    playMove('e2', 'e4')
+
+    // Coach analyzes the position
+    expect(await screen.findByText('+0.35 pawns')).toBeInTheDocument()
+    expect(screen.getByText('Nf3')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Play suggested move' })).toBeInTheDocument()
+
+    window.history.pushState({}, '', '/')
+  })
+
+  it('renders Normal Play matchmaking lobby when mode=unrated without displaying playable board or Stockfish card', async () => {
+    window.history.pushState({}, '', '/live-chess?mode=unrated')
+    render(
+      <MemoryRouter initialEntries={['/live-chess?mode=unrated']}>
+        <AuthContext.Provider value={{
+          user: { username: 'BravePlayer', rating: 1250, games_played: 5, wins: 3, losses: 2, draws: 0, player_dna_status: 'balanced', is_admin: false },
+          loading: false, error: null, login: vi.fn(), register: vi.fn(), logout: vi.fn(), refreshUser: vi.fn(), clearError: vi.fn()
+        }}>
+          <LiveChessPage />
+        </AuthContext.Provider>
+      </MemoryRouter>
+    )
+
+    expect(await screen.findByRole('heading', { name: 'Normal Play' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Find a Human Opponent' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Find Human Opponent' })).toBeInTheDocument()
+    // Should NOT display Stockfish Position Analysis card
+    expect(screen.queryByRole('heading', { name: 'Position analysis' })).not.toBeInTheDocument()
+    // Should NOT display playable board before match
+    expect(screen.queryByRole('grid', { name: 'Chess board position' })).not.toBeInTheDocument()
+    window.history.pushState({}, '', '/')
+  })
+
+  it('shows searching modal when queuing and supports cancellation', async () => {
+    window.history.pushState({}, '', '/live-chess?mode=unrated')
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/api/matchmaking/queue')) {
+        return Promise.resolve(response({ status: 'waiting', wait_seconds: 3, queue_length: 1 }))
+      }
+      return Promise.resolve(response({}))
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    render(
+      <MemoryRouter initialEntries={['/live-chess?mode=unrated']}>
+        <AuthContext.Provider value={{
+          user: { username: 'BravePlayer', rating: 1250, games_played: 5, wins: 3, losses: 2, draws: 0, player_dna_status: 'balanced', is_admin: false },
+          loading: false, error: null, login: vi.fn(), register: vi.fn(), logout: vi.fn(), refreshUser: vi.fn(), clearError: vi.fn()
+        }}>
+          <LiveChessPage />
+        </AuthContext.Provider>
+      </MemoryRouter>
+    )
+
+    const findBtn = await screen.findByRole('button', { name: 'Find Human Opponent' })
+    fireEvent.click(findBtn)
+
+    expect(await screen.findByRole('heading', { name: 'Searching for Opponent…' })).toBeInTheDocument()
+    expect(screen.getByText(/Waiting for an available human player/)).toBeInTheDocument()
+
+    const cancelBtn = screen.getByRole('button', { name: 'Cancel Search' })
+    fireEvent.click(cancelBtn)
+
+    await waitFor(() => {
+      expect(screen.queryByRole('heading', { name: 'Searching for Opponent…' })).not.toBeInTheDocument()
+    })
+    window.history.pushState({}, '', '/')
+  })
+
+  it('prompts guest to sign in when visiting Normal Play while unauthenticated', async () => {
+    window.history.pushState({}, '', '/live-chess?mode=unrated')
+    render(
+      <MemoryRouter initialEntries={['/live-chess?mode=unrated']}>
+        <AuthContext.Provider value={{
+          user: null, loading: false, error: null, login: vi.fn(), register: vi.fn(), logout: vi.fn(), refreshUser: vi.fn(), clearError: vi.fn()
+        }}>
+          <LiveChessPage />
+        </AuthContext.Provider>
+      </MemoryRouter>
+    )
+
+    expect(await screen.findByText('Sign in to queue for human multiplayer games.')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Sign In to Play' })).toHaveAttribute('href', '/login?from=/live-chess?mode=unrated')
+    window.history.pushState({}, '', '/')
   })
 })

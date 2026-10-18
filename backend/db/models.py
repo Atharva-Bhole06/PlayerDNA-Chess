@@ -48,6 +48,7 @@ class UserAccount(Base):
     wins = Column(Integer, nullable=False, default=0)
     losses = Column(Integer, nullable=False, default=0)
     draws = Column(Integer, nullable=False, default=0)
+    is_admin = Column(Boolean, nullable=False, default=False, server_default=func.false())
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
 
@@ -377,3 +378,27 @@ class DNAFeatureScaler(Base):
     q3 = Column(Float, nullable=False)
     iqr_scale = Column(Float, nullable=False)
     transformation = Column(Text, nullable=False)
+
+
+class AIExperiment(Base):
+    __tablename__ = "ai_experiments"
+
+    id = Column(String(36), primary_key=True)
+    name = Column(String(100), nullable=False)
+    white_preset = Column(String(50), nullable=False)
+    black_preset = Column(String(50), nullable=False)
+    white_config = Column(JSON, nullable=False)
+    black_config = Column(JSON, nullable=False)
+    games_total = Column(Integer, nullable=False, default=1)
+    status = Column(String(20), nullable=False, default="queued")  # queued, running, completed, failed, cancelled
+    white_wins = Column(Integer, nullable=False, default=0)
+    black_wins = Column(Integer, nullable=False, default=0)
+    draws = Column(Integer, nullable=False, default=0)
+    pgn = Column(Text, nullable=False, default="")
+    final_fen = Column(Text, nullable=True)
+    termination = Column(String(50), nullable=True)
+    error_message = Column(Text, nullable=True)
+    created_by_user_id = Column(String(36), ForeignKey("user_accounts.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    started_at = Column(DateTime(timezone=True), nullable=True)
+    completed_at = Column(DateTime(timezone=True), nullable=True)

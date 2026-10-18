@@ -9,10 +9,11 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from backend.config import CORS_ORIGINS
 from backend.db.session import DatabaseUnavailableError, database_is_available, dispose_engine
-from backend.routes import auth, chess, matchmaking, players
+from backend.routes import auth, chess, demo, matchmaking, players
 from backend.routes.match_queue import router as match_queue_router
 from backend.routes.live_games import router as live_games_router
 from backend.routes.registered_players import router as registered_players_router
+from backend.routes.research import router as research_router
 from backend.schemas.health import HealthResponse
 from backend.services.chess_service import chess_service
 from backend.services.live_game_service import GameError
@@ -50,6 +51,10 @@ api.include_router(matchmaking.router)
 api.include_router(chess.router)
 api.include_router(live_games_router)
 api.include_router(registered_players_router)
+api.include_router(research_router)
+api.include_router(demo.router)
+
+
 
 
 @api.get(

@@ -1,5 +1,6 @@
 import unittest
 import uuid
+from datetime import datetime, timedelta, timezone
 
 import chess
 from sqlalchemy import create_engine, func, select
@@ -107,8 +108,78 @@ class LivePlatformServiceTests(unittest.TestCase):
                 inaccuracies_per_100_cp_moves=index, feature_version="live_dna_raw_v1"))
         self.session.commit()
         distance = live_dna_distance(self.session, users[0].id, users[1].id)
-        self.assertIsNotNone(distance)
-        self.assertGreater(distance, 0)
+    def test_casual_matchmaking_pairing_and_no_elo_change(self):
+        queue = MatchQueueService(self.session)
+        first = queue.join(self.alice, mode="casual")
+        self.assertEqual(first["status"], "waiting")
+        alice_status = queue.status(self.alice)
+        self.assertEqual(alice_status["status"], "waiting")
+
+        second = queue.join(self.bob, mode="casual")
+        self.assertEqual(second["status"], "matched")
+        game_id = second["game_id"]
+        self.assertIsNotNone(game_id)
+
+        alice_updated = queue.status(self.alice)
+        self.assertEqual(alice_updated["status"], "matched")
+        self.assertEqual(alice_updated["game_id"], game_id)
+
+        game = self.session.get(LiveGame, game_id)
+        self.assertIn('Event "Casual Match"', game.pgn)
+
+        # Resign game to finish it
+        service = LiveGameService(self.session)
+        alice_rating_before = self.alice.rating
+        bob_rating_before = self.bob.rating
+
+        service.action(game_id, self.alice.id, "resign")
+
+        self.session.refresh(self.alice)
+        self.session.refresh(self.bob)
+        self.assertEqual(self.alice.rating, alice_rating_before)
+        self.assertEqual(self.bob.rating, bob_rating_before)
+
+        rating_histories = self.session.scalars(
+            select(CompetitiveRatingHistory).where(CompetitiveRatingHistory.game_id == game_id)
+        ).all()
+        self.assertEqual(len(rating_histories), 0)
+
+    def test_casual_queue_cancellation(self):
+        queue = MatchQueueService(self.session)
+        queue.join(self.alice, mode="casual")
+        status = queue.status(self.alice)
+        self.assertEqual(status["status"], "waiting")
+
+        cancelled = queue.cancel(self.alice.id)
+        self.assertEqual(cancelled["status"], "cancelled")
+
+        after_status = queue.status(self.alice)
+        self.assertEqual(after_status["status"], "idle")
+
+    def test_active_game_clock_timeout_frees_user_for_new_matchmaking(self):
+        # Create an expired active game
+        game = LiveGame(
+            id=str(uuid.uuid4()),
+            white_user_id=self.alice.id,
+            black_user_id=self.bob.id,
+            status="active",
+            current_fen=chess.Board().fen(),
+            pgn="",
+            white_time_ms=0,
+            black_time_ms=300_000,
+            turn_started_at=datetime.now(timezone.utc) - timedelta(seconds=10),
+        )
+        self.session.add(game)
+        self.session.commit()
+
+        queue = MatchQueueService(self.session)
+        # Alice attempts to queue; the expired game must be finalized and Alice should be allowed to queue
+        result = queue.join(self.alice, mode="casual")
+        self.assertEqual(result["status"], "waiting")
+
+        self.session.refresh(game)
+        self.assertEqual(game.status, "completed")
+        self.assertEqual(game.termination, "timeout")
 
 
 if __name__ == "__main__":

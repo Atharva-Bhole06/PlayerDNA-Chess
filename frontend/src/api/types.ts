@@ -12,6 +12,7 @@ export interface AuthenticatedProfile {
   losses: number
   draws: number
   player_dna_status: string
+  is_admin: boolean
 }
 
 export interface LeaderboardEntry {
@@ -42,6 +43,66 @@ export interface RecentGame {
   stars: number | null
 }
 
+export interface MoveAnalysisItem {
+  ply: number
+  move_number: number
+  color: 'white' | 'black'
+  user_id: string
+  is_user_move: boolean
+  played_san: string
+  played_uci: string
+  best_move_san?: string | null
+  best_move_uci?: string | null
+  cpl?: number | null
+  best_move_agreement?: boolean | null
+  classification?: string | null
+  fen_before: string
+  fen_after: string
+  played_score_cp?: number | null
+  played_score_mate?: number | null
+  best_score_cp?: number | null
+  best_score_mate?: number | null
+  engine_depth?: number | null
+  explanation?: string | null
+}
+
+export interface OpponentReportSummary {
+  username: string
+  rating: number
+  rating_after?: number | null
+  rating_change?: number | null
+  color: 'white' | 'black'
+  accuracy_pct?: number | null
+  average_cpl?: number | null
+  stars?: number | null
+  star_reason?: string | null
+  blunders?: number | null
+  mistakes?: number | null
+  inaccuracies?: number | null
+  best_move_agreement_pct?: number | null
+}
+
+export interface PreviousGameComparison {
+  previous_game_id: string
+  finished_at?: string | null
+  opponent_username: string
+  accuracy_current?: number | null
+  accuracy_previous?: number | null
+  accuracy_delta?: number | null
+  average_cpl_current?: number | null
+  average_cpl_previous?: number | null
+  average_cpl_delta?: number | null
+  blunders_current?: number | null
+  blunders_previous?: number | null
+  blunders_delta?: number | null
+  mistakes_current?: number | null
+  mistakes_previous?: number | null
+  mistakes_delta?: number | null
+  inaccuracies_current?: number | null
+  inaccuracies_previous?: number | null
+  inaccuracies_delta?: number | null
+}
+
 export interface PerformanceReport {
   game_id: string
   analysis_status: 'queued' | 'processing' | 'completed' | 'failed'
@@ -65,6 +126,20 @@ export interface PerformanceReport {
   critical_moves: Array<{ ply: number; played_move: string; best_move: string; cpl: number; classification: string }> | null
   recommendations: string[] | null
   message: string | null
+  color?: 'white' | 'black'
+  user_won?: boolean | null
+  result_outcome?: 'win' | 'loss' | 'draw'
+  user_rating?: number
+  user_rating_after?: number
+  rating_change?: number | null
+  is_rated?: boolean
+  finished_at?: string | null
+  termination?: string | null
+  pgn?: string | null
+  current_fen?: string | null
+  moves?: MoveAnalysisItem[] | null
+  opponent_report?: OpponentReportSummary | null
+  previous_game_comparison?: PreviousGameComparison | null
 }
 
 export interface LiveDNASnapshot {
@@ -162,4 +237,52 @@ export interface ChessRecommendationResponse {
   depth: number | null
   analysis_time_ms: number
   terminal_reason: string | null
+}
+
+export interface AIExperimentPreset {
+  id?: string
+  name: string
+  description: string
+  skill_level: number
+  depth: number
+  movetime_ms: number
+  threads: number
+  hash_mb: number
+  approx_rating?: number
+}
+
+export interface AIExperiment {
+  id: string
+  name: string
+  white_preset: string
+  black_preset: string
+  white_config: AIExperimentPreset
+  black_config: AIExperimentPreset
+  games_total: number
+  status: 'queued' | 'running' | 'completed' | 'failed' | 'cancelled'
+  white_wins: number
+  black_wins: number
+  draws: number
+  pgn: string
+  final_fen: string | null
+  termination: string | null
+  error_message: string | null
+  created_at: string
+  started_at: string | null
+  completed_at: string | null
+}
+
+export interface MLStatusResponse {
+  status: 'ready' | 'insufficient_data'
+  analyzed_users_count: number
+  required_users_count: number
+  message: string
+  active_model: {
+    version: string
+    model_type: string
+    purpose: string
+    training_rows: number
+    metrics: Record<string, any>
+    trained_at: string | null
+  } | null
 }

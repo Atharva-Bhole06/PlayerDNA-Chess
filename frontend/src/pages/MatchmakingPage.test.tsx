@@ -22,9 +22,16 @@ describe('Matchmaking page', () => {
 
   it('shows the loading state while recommendations are pending', async () => {
     let resolveRecommendation!: (value: Response) => void
-    vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string) => url.endsWith('/api/players') ? Promise.resolve(response(players)) : new Promise<Response>(resolve => { resolveRecommendation = resolve })))
+    vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string) => {
+      if (url.endsWith('/health')) return Promise.resolve(response({ status: 'ok', database_available: true, stockfish_available: false }))
+      if (url.endsWith('/api/players')) return Promise.resolve(response(players))
+      if (url.includes('/api/auth/')) return Promise.resolve(response(null, 401))
+      if (url.includes('/matchmaking/')) return new Promise<Response>(resolve => { resolveRecommendation = resolve })
+      return Promise.resolve(response({}))
+    }))
     renderPage('/matchmaking?player=Ada')
     expect(await screen.findByText('Loading recommendations for Ada…')).toBeInTheDocument()
+    await waitFor(() => expect(typeof resolveRecommendation).toBe('function'))
     await act(async () => resolveRecommendation(response(matchmaking('Ada'))))
     expect(await screen.findByRole('heading', { name: 'Mira' })).toBeInTheDocument()
   })

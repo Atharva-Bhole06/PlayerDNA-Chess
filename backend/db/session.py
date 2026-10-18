@@ -56,7 +56,10 @@ def get_engine() -> Engine:
             if _engine is None:
                 try:
                     url = get_database_url()
-                    _engine = create_engine(url, pool_pre_ping=True, pool_size=5, max_overflow=10)
+                    kwargs = {"pool_pre_ping": True}
+                    if "sqlite" not in url:
+                        kwargs.update(pool_size=5, max_overflow=10)
+                    _engine = create_engine(url, **kwargs)
                 except DatabaseUnavailableError:
                     raise
                 except Exception as exc:
@@ -73,6 +76,8 @@ def get_db() -> Generator[Session, None, None]:
             except SQLAlchemyError as exc:
                 session.rollback()
                 raise DatabaseUnavailableError("Database operation failed") from exc
+            finally:
+                session.rollback()
     except DatabaseUnavailableError:
         raise
     except SQLAlchemyError as exc:

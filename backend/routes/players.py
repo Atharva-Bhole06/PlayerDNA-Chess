@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from backend.db.session import get_db
 from backend.repositories.player_repository import PlayerRepository
+from backend.routes.dependencies import admin_user
 from backend.schemas.players import PlayerProfileResponse, PlayerSummary
 from backend.services.player_service import (
     PlayerDataUnavailableError,
@@ -34,10 +35,13 @@ def _player_service(session: Session = Depends(get_db)) -> PlayerService:
     "",
     response_model=list[PlayerSummary],
     summary="List analyzed players",
-    description="Returns player IDs and summary fields for player selection/search.",
-    responses={503: {"description": "Player data is unavailable"}},
+    description="Returns player IDs and summary fields for player selection/search. Restricted to administrators.",
+    responses={401: {"description": "Authentication required"}, 403: {"description": "Administrator research access required"}, 503: {"description": "Player data is unavailable"}},
 )
-def list_players(service: PlayerService = Depends(_player_service)):
+def list_players(
+    _admin=Depends(admin_user),
+    service: PlayerService = Depends(_player_service),
+):
     try:
         return service.list_players()
     except PlayerDataUnavailableError as exc:
@@ -51,10 +55,14 @@ def list_players(service: PlayerService = Depends(_player_service)):
     "/{player_id}",
     response_model=PlayerProfileResponse,
     summary="Get a player profile",
-    description="Returns curated performance statistics and Player DNA features.",
-    responses={404: {"description": "Player not found"}, 422: {"description": "Invalid player ID"}, 503: {"description": "Player data is unavailable"}},
+    description="Returns curated performance statistics and Player DNA features. Restricted to administrators.",
+    responses={401: {"description": "Authentication required"}, 403: {"description": "Administrator research access required"}, 404: {"description": "Player not found"}, 422: {"description": "Invalid player ID"}, 503: {"description": "Player data is unavailable"}},
 )
-def get_player(player_id: PlayerId, service: PlayerService = Depends(_player_service)):
+def get_player(
+    player_id: PlayerId,
+    _admin=Depends(admin_user),
+    service: PlayerService = Depends(_player_service),
+):
     try:
         result = service.get_player(player_id)
     except PlayerDataUnavailableError as exc:

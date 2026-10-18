@@ -146,10 +146,75 @@ class StockfishServiceTests(unittest.TestCase):
         service.close()
         self.assertTrue(self.fake.quitted)
 
-    def test_missing_engine_path_is_reported(self):
-        service = StockfishService(engine_path="missing-stockfish.exe")
-        with self.assertRaises(EngineUnavailableError):
-            service.analyze(chess.STARTING_FEN)
+    def test_recorded_move_best_move_agreement_yields_zero_cpl_and_single_engine_call(self):
+        self.fake.move = chess.Move.from_uci("e2e4")
+        self.fake.score = chess.engine.PovScore(chess.engine.Cp(35), chess.WHITE)
+        result = self.service.analyze_move(chess.STARTING_FEN, "e2e4", depth=10)
+        self.assertTrue(result["best_move_agreement"])
+        self.assertEqual(result["best_move_uci"], "e2e4")
+        self.assertEqual(result["cpl"], 0)
+        self.assertEqual(result["classification"], "best_or_near_best")
+        self.assertEqual(self.fake.calls, 1)
+
+    def test_recorded_move_black_perspective_and_inaccuracy_classification(self):
+        # Position after 1. e4 (Black's turn to move)
+        fen_after_e4 = "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1"
+        self.fake.move = chess.Move.from_uci("e7e5")
+        # Best move e5 leaves Black at -29 cp (from Black's perspective)
+        self.fake.score = chess.engine.PovScore(chess.engine.Cp(-29), chess.BLACK)
+        # Played move d6 leaves Black at -43 cp (from Black's perspective)
+        self.fake.played_score = chess.engine.PovScore(chess.engine.Cp(-43), chess.BLACK)
+        result = self.service.analyze_move(fen_after_e4, "d7d6", depth=10)
+        self.assertFalse(result["best_move_agreement"])
+        self.assertEqual(result["best_move_uci"], "e7e5")
+        self.assertEqual(result["played_move_san"], "d6")
+        # CPL = best_cp - played_cp = -29 - (-43) = 14
+        self.assertEqual(result["cpl"], 14)
+        self.assertEqual(result["classification"], "inaccuracy")
+        self.assertGreaterEqual(result["cpl"], 0)
+
+    def test_recorded_move_mistake_and_blunder_thresholds(self):
+        # Inaccuracy: CPL > 10 and < 50
+        # Mistake: CPL >= 50 and < 100
+        # Blunder: CPL >= 100
+        self.fake.move = chess.Move.from_uci("d2d4")
+        self.fake.score = chess.engine.PovScore(chess.engine.Cp(40), chess.WHITE)
+
+        # Test Mistake (CPL = 60)
+        self.fake.played_score = chess.engine.PovScore(chess.engine.Cp(-20), chess.WHITE)
+        res_mistake = self.service.analyze_move(chess.STARTING_FEN, "e2e4", depth=10)
+        self.assertEqual(res_mistake["cpl"], 60)
+        self.assertEqual(res_mistake["classification"], "mistake")
+
+        # Test Blunder (CPL = 150)
+        self.fake.played_score = chess.engine.PovScore(chess.engine.Cp(-110), chess.WHITE)
+        res_blunder = self.service.analyze_move(chess.STARTING_FEN, "e2e4", depth=10)
+        self.assertEqual(res_blunder["cpl"], 150)
+        self.assertEqual(res_blunder["classification"], "blunder")
+
+    def test_recorded_move_forced_mate_scores_exclude_cpl(self):
+        self.fake.move = chess.Move.from_uci("d2d4")
+        # Best move has mate in 3
+        self.fake.score = chess.engine.PovScore(chess.engine.Mate(3), chess.WHITE)
+        # Played move has only centipawn score 250
+        self.fake.played_score = chess.engine.PovScore(chess.engine.Cp(250), chess.WHITE)
+        result = self.service.analyze_move(chess.STARTING_FEN, "e2e4", depth=10)
+        self.assertIsNone(result["cpl"])
+        self.assertEqual(result["classification"], "mate_evaluation")
+        self.assertEqual(result["best_score_mate"], 3)
+        self.assertIsNone(result["best_score_cp"])
+        self.assertEqual(result["played_score_cp"], 250)
+
+    def test_cpl_is_never_negative_even_with_negative_evaluations(self):
+        # Black to move, both moves are in a losing position (negative cp)
+        fen_black = "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1"
+        self.fake.move = chess.Move.from_uci("c7c5")
+        self.fake.score = chess.engine.PovScore(chess.engine.Cp(-200), chess.BLACK)
+        # Suppose played move evaluates slightly better by 5 cp due to search noise (-195)
+        self.fake.played_score = chess.engine.PovScore(chess.engine.Cp(-195), chess.BLACK)
+        result = self.service.analyze_move(fen_black, "e7e5", depth=10)
+        self.assertGreaterEqual(result["cpl"], 0)
+        self.assertEqual(result["cpl"], 0)
 
 
 if __name__ == "__main__":

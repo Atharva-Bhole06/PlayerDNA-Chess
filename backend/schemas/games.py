@@ -79,9 +79,72 @@ class RecentGame(BaseModel):
     rating_before: int
     rating_after: int
     rating_change: int
-    finished_at: datetime
+    finished_at: datetime | None = None
     analysis_status: str
     stars: int | None
+
+
+class MoveAnalysisItem(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    ply: int
+    move_number: int
+    color: str
+    user_id: str
+    is_user_move: bool
+    played_san: str
+    played_uci: str
+    best_move_san: str | None = None
+    best_move_uci: str | None = None
+    cpl: int | None = None
+    best_move_agreement: bool | None = None
+    classification: str | None = None
+    fen_before: str
+    fen_after: str
+    played_score_cp: int | None = None
+    played_score_mate: int | None = None
+    best_score_cp: int | None = None
+    best_score_mate: int | None = None
+    engine_depth: int | None = None
+    explanation: str | None = None
+
+
+class OpponentReportSummary(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    username: str
+    rating: int
+    rating_after: int | None = None
+    rating_change: int | None = None
+    color: str
+    accuracy_pct: float | None = None
+    average_cpl: float | None = None
+    stars: int | None = None
+    star_reason: str | None = None
+    blunders: int | None = None
+    mistakes: int | None = None
+    inaccuracies: int | None = None
+    best_move_agreement_pct: float | None = None
+
+
+class PreviousGameComparison(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    previous_game_id: str
+    finished_at: datetime | None = None
+    opponent_username: str
+    accuracy_current: float | None = None
+    accuracy_previous: float | None = None
+    accuracy_delta: float | None = None
+    average_cpl_current: float | None = None
+    average_cpl_previous: float | None = None
+    average_cpl_delta: float | None = None
+    blunders_current: int | None = None
+    blunders_previous: int | None = None
+    blunders_delta: int | None = None
+    mistakes_current: int | None = None
+    mistakes_previous: int | None = None
+    mistakes_delta: int | None = None
+    inaccuracies_current: int | None = None
+    inaccuracies_previous: int | None = None
+    inaccuracies_delta: int | None = None
 
 
 class PerformanceReport(BaseModel):
@@ -108,6 +171,20 @@ class PerformanceReport(BaseModel):
     critical_moves: list[dict] | None
     recommendations: list[str] | None
     message: str | None
+    color: str | None = None
+    user_won: bool | None = None
+    result_outcome: str | None = None
+    user_rating: int | None = None
+    user_rating_after: int | None = None
+    rating_change: int | None = None
+    is_rated: bool = False
+    finished_at: datetime | None = None
+    termination: str | None = None
+    pgn: str | None = None
+    current_fen: str | None = None
+    moves: list[MoveAnalysisItem] | None = None
+    opponent_report: OpponentReportSummary | None = None
+    previous_game_comparison: PreviousGameComparison | None = None
 
 
 class MoveCommand(BaseModel):

@@ -8,9 +8,57 @@ export function PlayerDNAPage() {
   const [players, setPlayers] = useState<PlayerSummary[] | null>(null)
   const [profile, setProfile] = useState<PlayerProfile | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const SESSION_KEY = 'playerdna_last_selected_player'
   const selected = params.get('player') ?? ''
-  useEffect(() => { let cancelled = false; getPlayers().then(rows => { if (!cancelled) { setPlayers(rows); if (!selected && rows.length) setParams({ player: rows[0].player_id }, { replace: true }) } }).catch(e => { if (!cancelled) setError(e instanceof Error ? e.message : 'Unable to load players') }); return () => { cancelled = true } }, [])
-  useEffect(() => { if (!selected) { setProfile(null); return }; let cancelled = false; setProfile(null); setError(null); getPlayer(selected).then(p => { if (!cancelled) setProfile(p) }).catch(e => { if (!cancelled) setError(e instanceof Error ? e.message : 'Unable to load profile') }); return () => { cancelled = true } }, [selected])
+
+  useEffect(() => {
+    let cancelled = false
+    getPlayers().then(rows => {
+      if (cancelled) return
+      setPlayers(rows)
+      if (!selected && rows.length) {
+        let fallback = rows[0].player_id
+        try {
+          const cached = sessionStorage.getItem(SESSION_KEY)
+          if (cached && rows.some(r => r.player_id === cached)) {
+            fallback = cached
+          }
+        } catch {
+          // ignore storage error
+        }
+        setParams({ player: fallback }, { replace: true })
+      }
+    }).catch(e => {
+      if (!cancelled) setError(e instanceof Error ? e.message : 'Unable to load players')
+    })
+    return () => { cancelled = true }
+  }, [selected, setParams])
+
+  useEffect(() => {
+    if (selected) {
+      try {
+        sessionStorage.setItem(SESSION_KEY, selected)
+      } catch {
+        // ignore storage error
+      }
+    }
+  }, [selected])
+
+  useEffect(() => {
+    if (!selected) {
+      setProfile(null)
+      return
+    }
+    let cancelled = false
+    setProfile(null)
+    setError(null)
+    getPlayer(selected).then(p => {
+      if (!cancelled) setProfile(p)
+    }).catch(e => {
+      if (!cancelled) setError(e instanceof Error ? e.message : 'Unable to load profile')
+    })
+    return () => { cancelled = true }
+  }, [selected])
   const player = players?.find(row => row.player_id === selected)
   return <div className="page-wrap">
     <header className="page-header"><div><div className="eyebrow">PLAYER INTELLIGENCE</div><h1>Player DNA</h1><p>Explore observed performance statistics and raw chess performance measurements.</p></div><span className="phase-badge"><span className="phase-dot" /> PROFILE ANALYSIS</span></header>

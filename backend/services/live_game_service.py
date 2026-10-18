@@ -39,8 +39,16 @@ def _board_from_moves(session: Session, game: LiveGame) -> chess.Board:
     return board
 
 
-def _pgn(board: chess.Board, result: str | None = None) -> str:
+def _event_name(pgn: str | None) -> str:
+    if pgn and "Casual Match" in pgn:
+        return "Casual Match"
+    return "Competitive Match"
+
+
+def _pgn(board: chess.Board, result: str | None = None, event: str | None = None) -> str:
     game = chess.pgn.Game.from_board(board)
+    if event:
+        game.headers["Event"] = event
     if result is not None:
         game.headers["Result"] = result
     exporter = chess.pgn.StringExporter(headers=True, variations=False, comments=False)
@@ -69,14 +77,16 @@ class LiveGameService:
             raise GameError("You are not a participant in this game", 403)
         return game
 
-    def state(self, game_id: str, user_id: str) -> dict:
-        game = self._game(game_id, user_id, lock=True)
+    def state(self, game_id: str, user_id: str, lock: bool = False) -> dict:
+        game = self._game(game_id, user_id, lock=lock)
         board = _board_from_moves(self.session, game)
         now = datetime.now(timezone.utc)
         if game.status == "active":
             elapsed = max(0, int((now - _utc(game.turn_started_at)).total_seconds() * 1000))
             remaining = game.white_time_ms if board.turn == chess.WHITE else game.black_time_ms
             if elapsed >= remaining:
+                if not lock:
+                    game = self._game(game_id, user_id, lock=True)
                 self._finish(game, _timeout_result(board), "timeout")
                 self.session.commit()
         return self._serialize(game, user_id)
@@ -115,7 +125,7 @@ class LiveGameService:
             game.black_time_ms = new_clock
         game.turn_started_at = now
         game.current_fen = board.fen()
-        game.pgn = _pgn(board)
+        game.pgn = _pgn(board, event=_event_name(game.pgn))
         game.draw_offered_by = None
         self.session.add(LiveGameMove(game_id=game_id, ply_number=count + 1, user_id=moving_user,
                                       uci=move.uci(), san=san, fen_before=fen_before, fen_after=board.fen()))
@@ -168,30 +178,33 @@ class LiveGameService:
         black = self.session.get(UserAccount, game.black_user_id)
         if white is None or black is None:
             raise GameError("Game participant is unavailable", 500)
-        white_before, black_before = white.rating, black.rating
-        score_white = 1.0 if result == "1-0" else 0.0 if result == "0-1" else 0.5
-        expected_white = 1 / (1 + 10 ** ((black_before - white_before) / 400))
-        delta_white = round(ELO_K * (score_white - expected_white))
-        white.rating += delta_white
-        black.rating -= delta_white
-        white.games_played += 1
-        black.games_played += 1
-        if result == "1-0":
-            white.wins += 1; black.losses += 1
-        elif result == "0-1":
-            black.wins += 1; white.losses += 1
-        else:
-            white.draws += 1; black.draws += 1
+
+        is_casual = _event_name(game.pgn) == "Casual Match"
+        if not is_casual:
+            white_before, black_before = white.rating, black.rating
+            score_white = 1.0 if result == "1-0" else 0.0 if result == "0-1" else 0.5
+            expected_white = 1 / (1 + 10 ** ((black_before - white_before) / 400))
+            delta_white = round(ELO_K * (score_white - expected_white))
+            white.rating += delta_white
+            black.rating -= delta_white
+            white.games_played += 1
+            black.games_played += 1
+            if result == "1-0":
+                white.wins += 1; black.losses += 1
+            elif result == "0-1":
+                black.wins += 1; white.losses += 1
+            else:
+                white.draws += 1; black.draws += 1
+            self.session.add_all([
+                CompetitiveRatingHistory(user_id=white.id, game_id=game.id, rating_before=white_before, rating_after=white.rating),
+                CompetitiveRatingHistory(user_id=black.id, game_id=game.id, rating_before=black_before, rating_after=black.rating),
+            ])
         game.status = "completed"
         game.result = result
         game.termination = termination
         game.finished_at = datetime.now(timezone.utc)
         game.draw_offered_by = None
-        game.pgn = _pgn(_board_from_moves(self.session, game), result)
-        self.session.add_all([
-            CompetitiveRatingHistory(user_id=white.id, game_id=game.id, rating_before=white_before, rating_after=white.rating),
-            CompetitiveRatingHistory(user_id=black.id, game_id=game.id, rating_before=black_before, rating_after=black.rating),
-        ])
+        game.pgn = _pgn(_board_from_moves(self.session, game), result, event=_event_name(game.pgn))
         self.session.add(GameAnalysisJob(game_id=game.id, status="queued", analysis_version="stockfish_live_v1"))
 
     def _serialize(self, game: LiveGame, user_id: str) -> dict:

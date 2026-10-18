@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from backend.db.session import get_db
 from backend.repositories.matchmaking_repository import MatchmakingRepository
+from backend.routes.dependencies import admin_user
 from backend.schemas.matchmaking import MatchmakingResponse
 from backend.services.matchmaking_service import MatchmakingDataUnavailableError, MatchmakingService
 
@@ -24,13 +25,14 @@ def _matchmaking_service(session: Session = Depends(get_db)) -> MatchmakingServi
     "/{player_id}",
     response_model=MatchmakingResponse,
     summary="Recommend similar players",
-    description="Ranks the existing Player DNA cohort using the supported matchmaking mode.",
-    responses={404: {"description": "Player not found"}, 422: {"description": "Invalid mode or top_n"}, 503: {"description": "Matchmaking data is unavailable"}},
+    description="Ranks the existing Player DNA cohort using the supported matchmaking mode. Restricted to administrators.",
+    responses={401: {"description": "Authentication required"}, 403: {"description": "Administrator research access required"}, 404: {"description": "Player not found"}, 422: {"description": "Invalid mode or top_n"}, 503: {"description": "Matchmaking data is unavailable"}},
 )
 def get_recommendations(
     player_id: PlayerId,
     mode: Mode = Query("most_similar", description="Supported mode: most_similar"),
     top_n: Annotated[int, Query(ge=1, le=29, description="Number of recommendations (1–29)")] = 5,
+    _admin=Depends(admin_user),
     service: MatchmakingService = Depends(_matchmaking_service),
 ):
     try:

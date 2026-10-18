@@ -111,6 +111,66 @@ class AuthApiTests(unittest.TestCase):
         self.assertEqual(recent[0]["analysis_status"], "queued")
         self.assertIsNone(recent[0]["stars"])
 
+    def test_two_different_clients_maintain_distinct_sessions_and_independent_logout(self):
+        client_b = TestClient(app, base_url="https://testserver")
+        self.client.post("/api/auth/register", json={"username": "AlphaUser", "password": "a-long-password"})
+        client_b.post("/api/auth/register", json={"username": "BetaUser", "password": "another-long-password"})
+
+        me_a = self.client.get("/api/auth/me")
+        me_b = client_b.get("/api/auth/me")
+        self.assertEqual(me_a.status_code, 200)
+        self.assertEqual(me_b.status_code, 200)
+        self.assertEqual(me_a.json()["username"], "AlphaUser")
+        self.assertNotEqual(me_a.json()["username"], me_b.json()["username"])
+
+        # Logout Client A
+        self.client.post("/api/auth/logout")
+        self.assertEqual(self.client.get("/api/auth/me").status_code, 401)
+
+        # Client B must remain authenticated
+        me_b_again = client_b.get("/api/auth/me")
+        self.assertEqual(me_b_again.status_code, 200)
+        self.assertEqual(me_b_again.json()["username"], "BetaUser")
+
+    def test_casual_matchmaking_api_pairing_and_no_elo_change(self):
+        client_b = TestClient(app, base_url="https://testserver")
+        self.client.post("/api/auth/register", json={"username": "CasualA", "password": "a-long-password"})
+        client_b.post("/api/auth/register", json={"username": "CasualB", "password": "another-long-password"})
+
+        first = self.client.post("/api/matchmaking/queue?mode=casual").json()
+        self.assertEqual(first["status"], "waiting")
+
+        second = client_b.post("/api/matchmaking/queue?mode=casual").json()
+        self.assertEqual(second["status"], "matched")
+        game_id = second["game_id"]
+        self.assertIsNotNone(game_id)
+
+        first_status = self.client.get("/api/matchmaking/queue").json()
+        self.assertEqual(first_status["status"], "matched")
+        self.assertEqual(first_status["game_id"], game_id)
+
+        # Both can fetch the restored game
+        game_a = self.client.get(f"/api/games/{game_id}").json()
+        game_b = client_b.get(f"/api/games/{game_id}").json()
+        self.assertEqual(game_a["game_id"], game_b["game_id"])
+        self.assertEqual(game_a["status"], "active")
+        self.assertIn("Casual Match", game_a["pgn"])
+
+        # Complete the game via resignation
+        with Session(self.engine) as session:
+            from backend.db.models import LiveGame
+            from backend.services.live_game_service import LiveGameService
+            game = session.get(LiveGame, game_id)
+            LiveGameService(session).action(game_id, game.white_user_id, "resign")
+
+        # Confirm completed state
+        game_after = self.client.get(f"/api/games/{game_id}").json()
+        self.assertEqual(game_after["status"], "completed")
+
+        # Ratings must NOT have changed for casual match
+        self.assertEqual(self.client.get("/api/auth/me").json()["rating"], 1200)
+        self.assertEqual(client_b.get("/api/auth/me").json()["rating"], 1200)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -16,3 +16,4 @@ class AuthenticatedProfile(BaseModel):
     losses: int
     draws: int
     player_dna_status: str
+    is_admin: bool = False

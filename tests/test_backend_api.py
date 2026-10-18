@@ -9,11 +9,19 @@ from tests.database_support import configure_test_database
 from backend.db.session import DatabaseUnavailableError, get_db
 
 
+from backend.routes.dependencies import admin_user
+from backend.db.models import UserAccount
+
+
 class BackendApiTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.previous_dependency_overrides = app.dependency_overrides.copy()
         configure_test_database()
+        app.dependency_overrides[admin_user] = lambda: UserAccount(
+            id="test-admin-id", username="AdminTest", username_key="admintest",
+            password_hash="test", player_id="test-p", rating=1200, is_admin=True,
+        )
 
     @classmethod
     def tearDownClass(cls):

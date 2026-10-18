@@ -14,7 +14,7 @@ PLAYER_DNA_CSV = Path(
     os.environ.get("PLAYER_DNA_CSV", PROJECT_ROOT / "data" / "player_dna.csv")
 )
 
-_default_origins = "http://localhost:5173,http://localhost:3000"
+_default_origins = "http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://127.0.0.1:3000"
 CORS_ORIGINS = tuple(
     origin.strip()
     for origin in os.environ.get("PLAYERDNA_CORS_ORIGINS", _default_origins).split(",")

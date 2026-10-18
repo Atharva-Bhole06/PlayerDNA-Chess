@@ -58,7 +58,8 @@ class AuthService:
         ).order_by(LivePlayerDNAHistory.snapshot_at.desc()).limit(1))
         dna_status = "available" if dna is not None else "collecting" if user.games_played else "awaiting_first_game"
         return {"username": user.username, "rating": user.rating, "games_played": user.games_played,
-                "wins": user.wins, "losses": user.losses, "draws": user.draws, "player_dna_status": dna_status}
+                "wins": user.wins, "losses": user.losses, "draws": user.draws, "player_dna_status": dna_status,
+                "is_admin": bool(user.is_admin)}
 
     def _new_session(self, user: UserAccount) -> str:
         token = secrets.token_urlsafe(32)

@@ -49,4 +49,16 @@ describe('Player DNA page', () => {
     render(<MemoryRouter><PlayerDNAPage /></MemoryRouter>)
     expect(await screen.findByText('No players available')).toBeInTheDocument()
   })
+
+  it('preserves cached player selection when navigating back without query parameters', async () => {
+    sessionStorage.setItem('playerdna_last_selected_player', 'Mira')
+    vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string) => {
+      if (url.endsWith('/api/players')) return response(players)
+      return response({ ...profile, player_id: 'Mira' })
+    }))
+
+    render(<MemoryRouter initialEntries={['/player-dna']}><Routes><Route path="/player-dna" element={<PlayerDNAPage />} /></Routes></MemoryRouter>)
+    expect(await screen.findByRole('heading', { name: 'Mira' })).toBeInTheDocument()
+    sessionStorage.removeItem('playerdna_last_selected_player')
+  })
 })

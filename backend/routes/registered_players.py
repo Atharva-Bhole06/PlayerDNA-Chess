@@ -70,14 +70,15 @@ def recent_games(user=Depends(current_user), session: Session = Depends(get_db))
         else:
             outcome = "loss"
         before = history.rating_before if history else (game.white_rating_at_start if is_white else game.black_rating_at_start)
-        after = history.rating_after if history else user.rating
+        after = history.rating_after if history else before
+        rating_change = (after - before) if history else 0
         results.append({
             "game_id": game.id, "opponent_username": opponent.username,
             "opponent_rating": game.black_rating_at_start if is_white else game.white_rating_at_start,
             "color": "white" if is_white else "black", "result": outcome,
             "termination": game.termination or "unknown", "rating_before": before,
             "rating_after": after, "rating_change": after - before,
-            "finished_at": game.finished_at, "analysis_status": job.status if job else "not_queued",
+            "finished_at": game.finished_at or game.created_at, "analysis_status": job.status if job else "not_queued",
             "stars": report.stars if report else None,
         })
     return results

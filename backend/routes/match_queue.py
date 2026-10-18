@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from backend.db.session import get_db
@@ -11,8 +11,8 @@ router = APIRouter(prefix="/matchmaking/queue", tags=["competitive matchmaking"]
 
 
 @router.post("", response_model=QueueStatus)
-def join_queue(user=Depends(current_user), session: Session = Depends(get_db)):
-    return MatchQueueService(session).join(user)
+def join_queue(mode: str = Query("competitive"), user=Depends(current_user), session: Session = Depends(get_db)):
+    return MatchQueueService(session).join(user, mode=mode)
 
 
 @router.get("", response_model=QueueStatus)

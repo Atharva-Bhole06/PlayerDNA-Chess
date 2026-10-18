@@ -83,6 +83,97 @@ class GameAnalysisServiceTests(unittest.TestCase):
         self.assertEqual(self.session.get(GameAnalysisJob, self.game.id).status, "failed")
         self.assertIsNone(self.session.get(PlayerGameReport, (self.game.id, self.alice.id)))
 
+    def test_four_star_and_three_star_fallback_rules_with_actual_metrics(self):
+        # Alice plays with 1 blunder and 25 cp average loss (acc = 100 * exp(-0.25) = 77.88% -> 4 stars)
+        # Bob plays with 3 blunders and 60 cp average loss (acc = 100 * exp(-0.6) = 54.88% -> falls back to 3 stars)
+        ply_counter = [0]
+        def evaluate(fen, uci):
+            ply_counter[0] += 1
+            board = chess.Board(fen)
+            move = chess.Move.from_uci(uci)
+            is_white = board.turn == chess.WHITE
+            if is_white:
+                # White: 7 best moves (cpl=0), 1 blunder at ply 15 (cpl=200) -> avg CPL = 200/8 = 25, acc ~ 77.9%, blunders=1
+                is_blunder = (ply_counter[0] == 15)
+                cpl = 200 if is_blunder else 0
+                cls = "blunder" if is_blunder else "best_or_near_best"
+            else:
+                # Black: 3 blunders (cpl=150 each), 5 best moves (cpl=0) -> avg CPL = 450/8 = 56.25, acc ~ 57.0%, blunders=3
+                is_blunder = (ply_counter[0] in (2, 4, 6))
+                cpl = 150 if is_blunder else 0
+                cls = "blunder" if is_blunder else "best_or_near_best"
+            return {
+                "best_move_uci": uci, "best_move_san": board.san(move), "played_move_san": board.san(move),
+                "best_score_cp": 50, "best_score_mate": None, "played_score_cp": 50 - cpl,
+                "played_score_mate": None, "cpl": cpl, "best_move_agreement": cpl == 0,
+                "classification": cls, "depth": 10, "analysis_time_ms": 1,
+            }
+
+        self.assertEqual(process_game_analysis(self.session, self.game.id, evaluate), "completed")
+        alice_rep = self.session.get(PlayerGameReport, (self.game.id, self.alice.id))
+        bob_rep = self.session.get(PlayerGameReport, (self.game.id, self.bob.id))
+
+        # Alice: accuracy ~ 77.9% >= 75 and blunders == 1 -> qualifies for 4 stars
+        self.assertEqual(alice_rep.stars, 4)
+        self.assertEqual(alice_rep.blunders, 1)
+        self.assertAlmostEqual(alice_rep.average_cpl, 25.0, places=1)
+        self.assertIn("4 stars", alice_rep.star_reason)
+
+        # Bob: accuracy ~ 57.0% < 75 and blunders == 3 -> falls back to 3 stars
+        self.assertEqual(bob_rep.stars, 3)
+        self.assertEqual(bob_rep.blunders, 3)
+        self.assertAlmostEqual(bob_rep.average_cpl, 56.25, places=1)
+        self.assertIn("3 stars", bob_rep.star_reason)
+
+    def test_forced_mate_moves_are_excluded_from_cp_averaging_and_track_events(self):
+        # Position with mate evaluations: cpl is None on mate plies
+        ply_counter = [0]
+        def evaluate(fen, uci):
+            ply_counter[0] += 1
+            board = chess.Board(fen)
+            move = chess.Move.from_uci(uci)
+            if ply_counter[0] == 1:
+                # White missed a mate in 2
+                return {
+                    "best_move_uci": "d2d4", "best_move_san": "d4", "played_move_san": board.san(move),
+                    "best_score_cp": None, "best_score_mate": 2, "played_score_cp": 100,
+                    "played_score_mate": None, "cpl": None, "best_move_agreement": False,
+                    "classification": "missed_forced_mate", "depth": 10, "analysis_time_ms": 1,
+                }
+            if ply_counter[0] == 2:
+                # Black allowed a mate in 1
+                return {
+                    "best_move_uci": "e7e5", "best_move_san": "e5", "played_move_san": board.san(move),
+                    "best_score_cp": -50, "best_score_mate": None, "played_score_cp": None,
+                    "played_score_mate": -1, "cpl": None, "best_move_agreement": False,
+                    "classification": "allowed_forced_mate", "depth": 10, "analysis_time_ms": 1,
+                }
+            # All other moves are best moves with 0 cpl
+            return {
+                "best_move_uci": uci, "best_move_san": board.san(move), "played_move_san": board.san(move),
+                "best_score_cp": 20, "best_score_mate": None, "played_score_cp": 20,
+                "played_score_mate": None, "cpl": 0, "best_move_agreement": True,
+                "classification": "best_or_near_best", "depth": 10, "analysis_time_ms": 1,
+            }
+
+        self.assertEqual(process_game_analysis(self.session, self.game.id, evaluate), "completed")
+        alice_rep = self.session.get(PlayerGameReport, (self.game.id, self.alice.id))
+        bob_rep = self.session.get(PlayerGameReport, (self.game.id, self.bob.id))
+
+        # Alice had 1 mate ply (cpl=None), so only 7 cp-evaluable moves
+        self.assertEqual(alice_rep.cp_evaluable_moves, 7)
+        self.assertEqual(alice_rep.moves_analyzed, 8)
+        # Because cp_evaluable_moves < 8 (MIN_CP_MOVES_FOR_STARS), stars must be None!
+        self.assertIsNone(alice_rep.stars)
+        self.assertIn("at least 8 centipawn-evaluable moves are required", alice_rep.star_reason)
+        # Mate event tracked
+        self.assertEqual(alice_rep.mate_events["missed_forced_mate"], 1)
+
+        # Bob had 1 allowed mate ply (cpl=None), so 7 cp-evaluable moves
+        self.assertEqual(bob_rep.cp_evaluable_moves, 7)
+        self.assertIsNone(bob_rep.stars)
+        self.assertEqual(bob_rep.mate_events["allowed_forced_mate"], 1)
+
 
 if __name__ == "__main__":
     unittest.main()

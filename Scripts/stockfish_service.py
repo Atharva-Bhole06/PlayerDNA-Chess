@@ -119,6 +119,9 @@ class StockfishService:
             )
         return board
 
+    # =========================================================================
+    # 4.1 Algorithms: 1) Stockfish Chess Engine Analysis
+    # =========================================================================
     def analyze(self, fen: str) -> dict[str, Any]:
         """Return a legal best move or a terminal-position result.
 
@@ -220,12 +223,15 @@ class StockfishService:
             try:
                 limit = chess.engine.Limit(depth=depth)
                 best_info = engine.analyse(board, limit)
-                played_info = engine.analyse(board, limit, root_moves=[played])
+                best_pv = best_info.get("pv") or []
+                if best_pv and best_pv[0] == played:
+                    played_info = best_info
+                else:
+                    played_info = engine.analyse(board, limit, root_moves=[played])
             except TimeoutError as exc:
                 raise EngineAnalysisTimeoutError("Stockfish did not respond before the engine timeout") from exc
             except Exception as exc:
                 raise EngineUnavailableError(f"Stockfish game analysis failed: {exc}") from exc
-        best_pv = best_info.get("pv") or []
         if not best_pv or best_pv[0] not in board.legal_moves:
             raise EngineUnavailableError("Stockfish returned no legal best move")
         best_score = best_info.get("score")
@@ -239,14 +245,20 @@ class StockfishService:
         played_mate = played_relative.mate() if played_relative.is_mate() else None
         best_cp = None if best_mate is not None else best_relative.score()
         played_cp = None if played_mate is not None else played_relative.score()
-        cpl = max(0, best_cp - played_cp) if best_cp is not None and played_cp is not None else None
+        is_agreement = best_pv[0] == played
+        if is_agreement:
+            cpl = 0
+        elif best_cp is not None and played_cp is not None:
+            cpl = max(0, best_cp - played_cp)
+        else:
+            cpl = None
         pv_board = board.copy()
         best_san = pv_board.san(best_pv[0])
         result = {"best_move_uci": best_pv[0].uci(), "best_move_san": best_san,
                   "played_move_san": board.san(played), "best_score_cp": best_cp,
                   "best_score_mate": best_mate, "played_score_cp": played_cp,
                   "played_score_mate": played_mate, "cpl": cpl,
-                  "best_move_agreement": best_pv[0] == played,
+                  "best_move_agreement": is_agreement,
                   "depth": best_info.get("depth", depth),
                   "analysis_time_ms": round((time.perf_counter() - started) * 1000, 2)}
         if cpl is not None:

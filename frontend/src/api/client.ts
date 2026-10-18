@@ -1,8 +1,17 @@
-import type { AuthenticatedProfile, ChessRecommendationResponse, HealthResponse, LeaderboardEntry, LiveDNASnapshot, MatchmakingFeatureGap, MatchmakingResponse, MultiplayerGameState, PerformanceReport, PlayerProfile, PlayerSummary, QueueStatus, RecentGame } from './types'
+import type { AIExperiment, AIExperimentPreset, AuthenticatedProfile, ChessRecommendationResponse, HealthResponse, LeaderboardEntry, LiveDNASnapshot, MatchmakingFeatureGap, MatchmakingResponse, MLStatusResponse, MultiplayerGameState, PerformanceReport, PlayerProfile, PlayerSummary, QueueStatus, RecentGame } from './types'
 
-const configuredBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim()
-const defaultBaseUrl = import.meta.env.DEV ? 'http://localhost:8000' : ''
-export const API_BASE_URL = (configuredBaseUrl || defaultBaseUrl).replace(/\/+$/, '')
+function getApiBaseUrl(): string {
+  const configured = import.meta.env.VITE_API_BASE_URL?.trim()
+  if (configured) return configured.replace(/\/+$/, '')
+  if (import.meta.env.DEV) {
+    if (typeof window !== 'undefined' && window.location?.hostname) {
+      return `http://${window.location.hostname}:8000`
+    }
+    return 'http://127.0.0.1:8000'
+  }
+  return ''
+}
+export const API_BASE_URL = getApiBaseUrl()
 
 export class ApiError extends Error {
   constructor(message: string, readonly status?: number) {
@@ -131,10 +140,28 @@ export async function getHealth(signal?: AbortSignal): Promise<HealthResponse> {
   return body as HealthResponse
 }
 
-export async function getCurrentUser(): Promise<AuthenticatedProfile | null> {
+export async function getCurrentUser(signal?: AbortSignal): Promise<AuthenticatedProfile | null> {
   let response: Response
-  try { response = await fetch(`${API_BASE_URL}/api/auth/me`, { credentials: 'include', headers: { Accept: 'application/json' } }) }
-  catch (error) { throw new ApiError(error instanceof Error ? error.message : 'Unable to reach the API') }
+  try {
+    let activeSignal = signal
+    let timer: ReturnType<typeof setTimeout> | undefined
+    if (!activeSignal && typeof AbortController !== 'undefined') {
+      const controller = new AbortController()
+      timer = setTimeout(() => controller.abort(), 8000)
+      activeSignal = controller.signal
+    }
+    try {
+      response = await fetch(`${API_BASE_URL}/api/auth/me`, {
+        credentials: 'include',
+        headers: { Accept: 'application/json' },
+        signal: activeSignal,
+      })
+    } finally {
+      if (timer) clearTimeout(timer)
+    }
+  } catch (error) {
+    throw new ApiError(error instanceof Error ? error.message : 'Unable to reach the API')
+  }
   if (response.status === 401) return null
   if (!response.ok) throw new ApiError(`Request failed with HTTP ${response.status}`, response.status)
   const body: unknown = await response.json()
@@ -143,7 +170,10 @@ export async function getCurrentUser(): Promise<AuthenticatedProfile | null> {
   if (typeof row.username !== 'string' || !Number.isInteger(row.rating) ||
       !['games_played', 'wins', 'losses', 'draws'].every(key => Number.isInteger(row[key])) ||
       typeof row.player_dna_status !== 'string') throw new ApiError('Account response did not match the expected schema')
-  return body as AuthenticatedProfile
+  return {
+    ...(body as AuthenticatedProfile),
+    is_admin: typeof row.is_admin === 'boolean' ? row.is_admin : false,
+  }
 }
 
 export async function authenticate(path: 'register' | 'login', username: string, password: string): Promise<AuthenticatedProfile> {
@@ -164,26 +194,42 @@ export async function logout(): Promise<void> {
   if (!response.ok) throw new ApiError(`Logout failed with HTTP ${response.status}`, response.status)
 }
 
-async function queueRequest(method: 'POST' | 'GET' | 'DELETE'): Promise<QueueStatus> {
-  const response = await fetch(`${API_BASE_URL}/api/matchmaking/queue`, { method, credentials: 'include', headers: { Accept: 'application/json' } })
+async function queueRequest(method: 'POST' | 'GET' | 'DELETE', mode?: 'competitive' | 'casual'): Promise<QueueStatus> {
+  const url = mode && method === 'POST' ? `${API_BASE_URL}/api/matchmaking/queue?mode=${encodeURIComponent(mode)}` : `${API_BASE_URL}/api/matchmaking/queue`
+  const response = await fetch(url, { method, credentials: 'include', headers: { Accept: 'application/json' } })
   if (!response.ok) throw new ApiError(`Matchmaking queue request failed with HTTP ${response.status}`, response.status)
   return response.json() as Promise<QueueStatus>
 }
-export const joinQueue = () => queueRequest('POST')
+export const joinQueue = (mode?: 'competitive' | 'casual') => queueRequest('POST', mode)
 export const getQueueStatus = () => queueRequest('GET')
 export const cancelQueue = () => queueRequest('DELETE')
 
 export async function getMultiplayerGame(gameId: string): Promise<MultiplayerGameState> {
   const response = await fetch(`${API_BASE_URL}/api/games/${encodeURIComponent(gameId)}`, { credentials: 'include', headers: { Accept: 'application/json' } })
   if (!response.ok) throw new ApiError(`Game request failed with HTTP ${response.status}`, response.status)
-  return response.json() as Promise<MultiplayerGameState>
+  const body: unknown = await response.json()
+  if (typeof body !== 'object' || body === null) {
+    throw new ApiError('Game response did not match the expected schema')
+  }
+  const row = body as Record<string, unknown>
+  if (
+    typeof row.game_id !== 'string' ||
+    (row.status !== 'active' && row.status !== 'completed') ||
+    (row.color !== 'white' && row.color !== 'black') ||
+    typeof row.white_username !== 'string' ||
+    typeof row.black_username !== 'string' ||
+    typeof row.fen !== 'string'
+  ) {
+    throw new ApiError('Game response did not match the expected schema')
+  }
+  return body as MultiplayerGameState
 }
 
 export function openGameSocket(gameId: string): WebSocket {
-  const base = API_BASE_URL || window.location.origin
+  const base = API_BASE_URL || (typeof window !== 'undefined' ? window.location.origin : 'http://127.0.0.1:8000')
   const url = new URL(`/api/games/${encodeURIComponent(gameId)}/ws`, base)
   url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
-  return new WebSocket(url)
+  return new WebSocket(url.toString())
 }
 
 export async function getLeaderboard(): Promise<LeaderboardEntry[]> {
@@ -236,4 +282,63 @@ export async function getPerformanceReport(gameId: string): Promise<PerformanceR
   const response = await fetch(`${API_BASE_URL}/api/games/${encodeURIComponent(gameId)}/report`, { credentials: 'include', headers: { Accept: 'application/json' } })
   if (!response.ok) throw new ApiError(`Game report request failed with HTTP ${response.status}`, response.status)
   return response.json() as Promise<PerformanceReport>
+}
+
+export async function triggerGameAnalysis(gameId: string): Promise<PerformanceReport> {
+  const response = await fetch(`${API_BASE_URL}/api/games/${encodeURIComponent(gameId)}/analyze`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { Accept: 'application/json' },
+  })
+  if (!response.ok) throw new ApiError(`Trigger analysis failed with HTTP ${response.status}`, response.status)
+  return response.json() as Promise<PerformanceReport>
+}
+
+
+export async function getEnginePresets(signal?: AbortSignal): Promise<Record<string, AIExperimentPreset>> {
+  const body = await getJson('/api/research/engine-presets', signal)
+  return body as Record<string, AIExperimentPreset>
+}
+
+export async function getExperiments(signal?: AbortSignal): Promise<AIExperiment[]> {
+  const body = await getJson('/api/research/experiments', signal)
+  if (!Array.isArray(body)) throw new ApiError('Experiments response did not match the expected schema')
+  return body as AIExperiment[]
+}
+
+export async function createExperiment(data: { name?: string; white_preset: string; black_preset: string }): Promise<AIExperiment> {
+  const response = await fetch(`${API_BASE_URL}/api/research/experiments`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  })
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => null) as { detail?: string } | null
+    throw new ApiError(typeof errorBody?.detail === 'string' ? errorBody.detail : `Experiment failed with HTTP ${response.status}`, response.status)
+  }
+  return response.json() as Promise<AIExperiment>
+}
+
+export async function getExperiment(id: string, signal?: AbortSignal): Promise<AIExperiment> {
+  const body = await getJson(`/api/research/experiments/${encodeURIComponent(id)}`, signal)
+  return body as AIExperiment
+}
+
+export async function cancelExperiment(id: string): Promise<AIExperiment> {
+  const response = await fetch(`${API_BASE_URL}/api/research/experiments/${encodeURIComponent(id)}/cancel`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { Accept: 'application/json' },
+  })
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => null) as { detail?: string } | null
+    throw new ApiError(typeof errorBody?.detail === 'string' ? errorBody.detail : `Cancel failed with HTTP ${response.status}`, response.status)
+  }
+  return response.json() as Promise<AIExperiment>
+}
+
+export async function getMLStatus(signal?: AbortSignal): Promise<MLStatusResponse> {
+  const body = await getJson('/api/research/ml/status', signal)
+  return body as MLStatusResponse
 }
