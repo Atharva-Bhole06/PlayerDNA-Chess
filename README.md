@@ -9,43 +9,43 @@ Beyond standard chess features, PlayerDNA characterizes player behavior through 
 ## 1. Project Overview & Features
 
 - **Interactive Play Arena (`/play`)**:
-  - Play against AI bots (Stockfish-powered with configurable search depth).
+  - Play against AI bots powered by Stockfish with selectable engine search depths.
   - Local Pass & Play mode.
-  - Real-time multiplayer matchmaking with registered accounts and Elo progression.
-  - Guest mode for instant casual play.
+  - Real-time multiplayer matchmaking with registered accounts and Elo rating progression.
+  - Guest mode for instant casual games.
 - **Game History & Analysis Workspace (`/history`, `/games/:id/report`)**:
-  - Full match history with results, Elo changes, and timestamps.
+  - Match history displaying outcomes, ratings, and finished timestamps.
   - Dedicated analysis workspace featuring an interactive evaluation chessboard.
-  - Move-by-move Stockfish centipawn loss (CPL) auditing and classification (best, inaccuracy, mistake, blunder, forced mate).
-  - Performance summaries, star ratings, accuracy metrics, and AI Coach explanations.
+  - Move-by-move Stockfish centipawn loss (CPL) auditing and classification (best move, inaccuracy, mistake, blunder, forced mate).
+  - Accuracy scores, star ratings, performance summaries, and plain-English AI Coach explanations.
 - **Asynchronous Analysis Worker (`backend.analysis_worker`)**:
   - Background daemon that processes queued game analysis jobs asynchronously without blocking live gameplay.
 - **Admin Research Portal (`/research`)**:
-  - Analysis of the 30-player historical cohort (1,200 games, 39,097 move audits).
+  - Analysis of the 30-player historical cohort (1,200 games, 39,097 audited moves).
   - 3D Player DNA behavioral space and feature distribution metrics.
-  - K-Nearest Neighbors (KNN) and cosine similarity style matching.
+  - K-Nearest Neighbors (KNN) and cosine similarity style matchmaking.
   - Machine learning model status and retraining workflows.
-- **Authentication & Player Profiles**:
+- **Authentication & User Management**:
   - Secure, HTTP-only cookie-based authentication.
-  - User profiles with win/loss records and Elo ratings.
-  - Role-based access control for administrative and research features.
+  - Player profiles with win/draw/loss records and rating histories.
+  - Operator CLI for promoting users to administrators for research access.
 
 ---
 
-## 2. Prerequisites (Windows)
+## 2. Prerequisites for Windows
 
-Ensure the following tools are installed on your Windows development environment:
+Ensure the following tools are installed on your Windows PC before proceeding:
 
-| Requirement | Supported Version | Notes |
-| :--- | :--- | :--- |
-| **Git** | Latest (2.x+) | Needed for version control and cloning |
-| **Python** | **3.12** (64-bit) | Required for backend, ML, and database migrations |
-| **Node.js & npm** | **>= 20.19.0** (npm >= 10.x) | Required for frontend build and Vite dev server |
-| **Docker Desktop** | Latest (with WSL 2) | Required to run PostgreSQL container |
-| **Stockfish** *(Optional)* | Stockfish 16 or 17 | Required for live move evaluation and analysis worker |
+| Tool | Required Version | Verification Command | Notes |
+| :--- | :--- | :--- | :--- |
+| **Git** | Latest (2.x+) | `git --version` | Required for cloning the repository |
+| **Python** | **3.12** (64-bit) | `python --version` | Ensure `Add python.exe to PATH` is checked during installation |
+| **Node.js & npm** | **>= 20.19.0** (npm >= 10.x) | `node -v` / `npm -v` | Required to build and run the React/Vite frontend |
+| **Docker Desktop** | Latest (with WSL 2) | `docker --version` | Required to run the PostgreSQL database container |
+| **Stockfish** *(Optional)* | Stockfish 16 or 17 | `stockfish` *(if on PATH)* | Required for AI bot moves, live recommendations, and report analysis |
 
-> **Note on PowerShell Script Execution:**
-> If you encounter a script execution policy error when activating Python virtual environments in PowerShell, run:
+> **PowerShell Script Execution Policy:**
+> Windows PowerShell restricts script execution by default. If activating Python virtual environments gives an execution policy error, run this command once in PowerShell:
 > ```powershell
 > Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 > ```
@@ -54,256 +54,282 @@ Ensure the following tools are installed on your Windows development environment
 
 ## 3. Clone Instructions
 
-Clone the repository to your local machine using Git in PowerShell:
+Open **PowerShell** and clone the repository using the official GitHub repository URL:
 
 ```powershell
-git clone <repository-url>
-cd AIML_Project-chess-
+git clone https://github.com/Atharva-Bhole06/PlayerDNA-Chess.git
+cd PlayerDNA-Chess
 ```
 
 ---
 
 ## 4. Python Virtual Environment & Dependencies
 
-From the repository root directory, create and activate a Python 3.12 virtual environment:
+From the repository root (`PlayerDNA-Chess`), create and activate a Python 3.12 virtual environment:
 
 ```powershell
-# Create virtual environment
+# Create virtual environment named .venv
 python -m venv .venv
 
-# Activate virtual environment in PowerShell
+# Activate the virtual environment
 .\.venv\Scripts\Activate.ps1
 
-# Upgrade pip
+# Upgrade pip to the latest version
 python -m pip install --upgrade pip
 ```
 
-Install all backend, database, ML, and test dependencies:
+### Install All Required Backend Dependencies
+Install all packages needed for the FastAPI backend, PostgreSQL database, Alembic migrations, scikit-learn ML models, and the test suite:
 
 ```powershell
 pip install -r requirements-database.txt -r requirements-ml.txt -r requirements-api-test.txt
 ```
 
-### Dependency Files Breakdown
-- `requirements-live-chess.txt`: Core live chess engine, FastAPI (`>=0.115`), Uvicorn (`>=0.30`), and python-chess (`>=1.999`).
-- `requirements-backend.txt`: Adds pandas (`>=2.2`), numpy (`>=2.0`), pydantic (`>=2.8`), and SQLAlchemy (`>=2.0`).
-- `requirements-database.txt`: Adds Alembic migration tool (`>=1.13`) and PostgreSQL binary driver psycopg (`>=3.2`).
-- `requirements-ml.txt`: Adds scikit-learn (`>=1.5`) and joblib (`>=1.4`) for Player DNA models.
-- `requirements-api-test.txt`: Adds httpx (`>=0.27`) for FastAPI API integration tests.
+#### How the Requirements Files Work:
+- `requirements-live-chess.txt`: Base live chess engine (`python-chess >= 1.999`), web API (`fastapi >= 0.115`), and ASGI server (`uvicorn[standard] >= 0.30`).
+- `requirements-backend.txt`: References `requirements-live-chess.txt` and adds data libraries (`pandas >= 2.2`, `numpy >= 2.0`, `pydantic >= 2.8`, `SQLAlchemy >= 2.0`).
+- `requirements-database.txt`: References `requirements-backend.txt` and adds PostgreSQL driver (`psycopg[binary] >= 3.2`) and migrations (`alembic >= 1.13`).
+- `requirements-ml.txt`: References `requirements-live-chess.txt` and adds machine learning libraries (`scikit-learn >= 1.5`, `joblib >= 1.4`).
+- `requirements-api-test.txt`: References `requirements-backend.txt` and adds HTTP test client (`httpx >= 0.27`).
 
 ---
 
 ## 5. Configure Environment Variables (`.env`)
 
-Create your local `.env` configuration file from `.env.example`:
+Copy the sample environment file `.env.example` to create your local `.env`:
 
 ```powershell
 Copy-Item .env.example .env
 ```
 
-Open `.env` in your code editor and configure your local PostgreSQL credentials:
+Open `.env` in your text editor (such as VS Code or Notepad) and configure your local settings:
 
 ```ini
-# PostgreSQL connection parameters
+# Database Connection
 DB_HOST=127.0.0.1
 DB_PORT=5432
 DB_NAME=playerdna
 DB_USER=playerdna_app
-DB_PASSWORD=your_local_secret_password_here
+DB_PASSWORD=choose_a_local_password_here
 
-# Exact frontend origins (no wildcards allowed)
+# Exact Allowed Frontend Origins (comma-separated; wildcards are disabled)
 PLAYERDNA_CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000
 
-# Game timer defaults (seconds)
+# Game Timer Defaults (seconds)
 PLAYERDNA_GAME_TIME_SECONDS=300
 PLAYERDNA_GAME_INCREMENT_SECONDS=0
 
-# Set false for local HTTP development; set true only when running over HTTPS
+# Set false for local HTTP development; set true only if serving over HTTPS
 PLAYERDNA_COOKIE_SECURE=false
 
-# (Optional) Full path to Stockfish binary if not on Windows PATH
+# Optional: Path to Stockfish executable if not added to system PATH
 # STOCKFISH_PATH=C:\Tools\stockfish\stockfish-windows-x86-64-avx2.exe
 ```
 
-> **Security Warning:**
-> Never commit `.env` or any file containing real passwords or secrets to Git. The `.gitignore` is already configured to exclude `.env`, `.venv`, and `node_modules`.
+> **Security Reminder:**
+> Never commit `.env` or real passwords to version control. The repository's `.gitignore` automatically excludes `.env`, `.venv/`, and `node_modules/`.
 
 ---
 
-## 6. Start PostgreSQL via Docker Compose
+## 6. Start PostgreSQL Using Docker Compose
 
-Start the PostgreSQL 16 container in the background using the provided `compose.yaml`:
+Make sure **Docker Desktop** is running, then launch the PostgreSQL 16 service in the background:
 
 ```powershell
 docker compose up -d postgres
 ```
 
-Verify that the database container is running and healthy:
+Verify that the container is running and healthy:
 
 ```powershell
 docker compose ps
 ```
 
-To stop the PostgreSQL container when done:
+The container healthcheck automatically verifies connectivity using `pg_isready`.
+
+To stop PostgreSQL when finished working:
 ```powershell
 docker compose down
 ```
 
 ---
 
-## 7. Run Database Migrations & Data Import
+## 7. Apply Database Migrations & Seed Data
 
-### Step 7.1 — Apply Alembic Migrations
-Run Alembic from the repository root to create all database tables:
+### Step 7.1 — Apply Database Migrations
+Run Alembic from the repository root to create all required database tables and relationships:
 
 ```powershell
 alembic upgrade head
 ```
 
-### Step 7.2 — Import Historical Cohort Data
-Populate the database with the verified 30-player historical research cohort (1,200 games, audited Stockfish move evaluations, and Player DNA scalers):
+### Step 7.2 — Import Historical Cohort Data *(For Research Portal)*
+The repository includes a validated 30-player historical research dataset located in `data/` (`processed_player_games.csv`, `chess_performance_features_v2.csv`, `stockfish_move_audit_v2.csv`, `player_profiles.csv`, `player_dna.csv`, and `player_dna_scaler_parameters.csv`).
+
+To populate the Research Portal (`/research`, `/research/player-dna`, `/matchmaking`) with this benchmark data, run:
 
 ```powershell
+# Import the 30-player historical cohort into PostgreSQL
 python -m backend.db.import_csv
-```
 
-Verify the database data integrity against the source CSV files:
-
-```powershell
+# Verify table counts, foreign keys, and fields against the source CSV files
 python -m backend.db.import_csv --verify
 ```
 
-### Step 7.3 — (Optional) Promote an Admin Account
-To access the Research Portal (`/research`), an account must have administrative privileges:
+*(Note: Live games, matchmaking, and player registration function without this step, but the Research Portal cohort metrics require this data).*
+
+### Step 7.3 — Grant Admin Privileges *(Optional)*
+The Research Portal is restricted to administrator accounts. After registering an account on the website (e.g. `admin_user`), promote it via the operator CLI:
 
 ```powershell
 # Promote a registered username to admin
-python -m backend.manage_admin promote <username>
+python -m backend.manage_admin promote admin_user
 
-# List all registered accounts and admin statuses
+# View all registered users and their admin statuses
 python -m backend.manage_admin list
 ```
 
 ---
 
-## 8. Start Backend & Frontend
+## 8. Run the Application
 
-Run the FastAPI backend and Vite frontend in **two separate PowerShell terminals**.
+Run the backend and frontend in **two separate PowerShell terminals**.
 
-### Terminal 1 — Backend (FastAPI & Uvicorn)
-From the repository root:
+### Terminal 1 — FastAPI Backend
+From the repository root (`PlayerDNA-Chess`):
 
 ```powershell
 # Activate virtual environment
 .\.venv\Scripts\Activate.ps1
 
-# Start FastAPI development server
+# Start the FastAPI server with auto-reload
 python -m uvicorn backend.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
-- API Base URL: `http://127.0.0.1:8000`
-- Interactive OpenAPI / Swagger Documentation: `http://127.0.0.1:8000/docs`
-- Health Check Endpoint: `http://127.0.0.1:8000/api/health`
+- **Backend API**: `http://127.0.0.1:8000`
+- **Interactive Swagger Docs**: `http://127.0.0.1:8000/docs`
+- **Health Check**: `http://127.0.0.1:8000/api/health`
 
-### Terminal 2 — Frontend (React & Vite)
-From the `frontend` directory:
+### Terminal 2 — React / Vite Frontend
+From a new PowerShell terminal, navigate to the `frontend` folder:
 
 ```powershell
-cd frontend
+cd path\to\PlayerDNA-Chess\frontend
 
 # Install Node dependencies
 npm install
 
-# Start Vite dev server
+# Start Vite development server
 npm run dev
 ```
 
-- Web Application: `http://localhost:5173`
-
-### Terminal 3 — (Optional) Background Analysis Worker
-To process completed games and generate Stockfish post-game reports asynchronously:
-
-```powershell
-.\.venv\Scripts\Activate.ps1
-python -m backend.analysis_worker
-```
-*(Use `python -m backend.analysis_worker --once` to process a single queued job, or `--retry-failed` to retry previously failed analyses).*
+- **Web Application**: `http://localhost:5173`
 
 ---
 
-## 9. Running Tests
+## 9. When are Stockfish & the Analysis Worker Needed?
 
-### 9.1 Backend Test Suite
-Run the backend unit and integration test suite using Python's built-in `unittest` runner:
+### 9.1 Stockfish Engine
+- **When is Stockfish needed?**
+  1. Playing against the AI bot at specific engine search depths.
+  2. Live engine move suggestions / recommendations during play.
+  3. Generating post-game move-by-move evaluation audits and centipawn loss (CPL).
+- **Is Stockfish required to run the project?**
+  - No. You can start the app, register accounts, play Pass & Play, and play multiplayer games without Stockfish installed.
+- **How to configure Stockfish:**
+  1. Download the Windows binary from [stockfishchess.org](https://stockfishchess.org/download/).
+  2. Either add the executable directory to your Windows `PATH` environment variable, or set `STOCKFISH_PATH` in `.env`:
+     ```ini
+     STOCKFISH_PATH=C:\path\to\stockfish.exe
+     ```
+  3. Smoke test the engine integration:
+     ```powershell
+     python test_stockfish.py
+     ```
+
+### 9.2 Background Analysis Worker
+- **What does it do?**
+  When a rated game finishes, the system creates a background job in `game_analysis_jobs` to audit every move with Stockfish, determine blunder/mistake classifications, calculate accuracy, and produce coaching advice.
+- **How to run the worker:**
+  Open a separate PowerShell terminal with `.venv` activated:
+  ```powershell
+  # Run worker continuously to process finished games as they arrive
+  python -m backend.analysis_worker
+
+  # Or process a single queued game and exit
+  python -m backend.analysis_worker --once
+
+  # Or retry any previously failed analysis jobs
+  python -m backend.analysis_worker --retry-failed
+  ```
+
+---
+
+## 10. Running the Test Suite
+
+### 10.1 Backend Tests
+Run the comprehensive backend test suite (database models, auth, live games, Stockfish service, and game report API) from the repository root:
 
 ```powershell
-# From repository root with virtual environment activated:
+# Run all backend unit and integration tests
 python -m unittest discover -s tests -p "test_*.py"
 ```
 
-To run a single backend test module:
+To run a specific test module with verbose output:
 ```powershell
 python -m unittest tests/test_backend_api.py -v
 python -m unittest tests/test_game_report_api.py -v
 python -m unittest tests/test_stockfish_service.py -v
 ```
 
-### 9.2 Frontend Test Suite & Build Validation
-Run Vitest and TypeScript production build checks:
+### 10.2 Frontend Tests & Production Build
+Run the frontend component tests and production build checks:
 
 ```powershell
-cd frontend
+cd path\to\PlayerDNA-Chess\frontend
 
-# Run frontend unit and component tests
+# Run Vitest test suite
 npm test
 
-# Run production build and TypeScript compilation
+# Verify TypeScript compilation and Vite production build
 npm run build
 ```
 
 ---
 
-## 10. Troubleshooting Common Setup Errors
+## 11. Troubleshooting Common Issues
 
-### 1. `DatabaseUnavailableError` or `connection to server at "127.0.0.1", port 5432 failed`
-- **Cause**: The PostgreSQL Docker container is not running or hasn't finished initializing.
-- **Solution**:
-  - Run `docker compose ps` to check container status.
-  - If exited or unhealthy, check logs: `docker compose logs postgres`.
-  - Ensure `.env` exists in the repository root and contains valid `DB_USER`, `DB_PASSWORD`, `DB_NAME`, `DB_PORT`, and `DB_HOST`.
+### 1. Database Connection Refused (`DatabaseUnavailableError`)
+- **Symptoms**: Backend displays `503 Database is unavailable` or `connection to server at "127.0.0.1", port 5432 failed`.
+- **Fix**:
+  - Verify that Docker Desktop is running.
+  - Check container status: `docker compose ps`.
+  - View database logs: `docker compose logs postgres`.
+  - Ensure `.env` exists in the repository root and has matching `DB_PORT`, `DB_USER`, `DB_NAME`, and `DB_PASSWORD`.
 
-### 2. Port 5432 Conflict (`bind: address already in use`)
-- **Cause**: A local PostgreSQL service is already running on port 5432 in Windows.
-- **Solution**:
-  - In PowerShell, run `Get-Service postgresql*` and stop it via `Stop-Service postgresql*`, **OR**
-  - Change `DB_PORT=5433` in `.env` and restart: `docker compose up -d postgres`.
+### 2. Port 5432 Already in Use
+- **Symptoms**: Docker error `bind: address already in use` when running `docker compose up -d postgres`.
+- **Cause**: A local instance of PostgreSQL is already running as a Windows service.
+- **Fix**:
+  - Stop the local Windows service in PowerShell: `Stop-Service postgresql*`, **OR**
+  - Change the port in `.env` (e.g., `DB_PORT=5433`), update `compose.yaml` port mapping accordingly, and restart Docker Compose.
 
-### 3. PowerShell Script Execution Blocked (`cannot be loaded because running scripts is disabled`)
-- **Cause**: Windows PowerShell security policy restricts script execution by default.
-- **Solution**: Run `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser` and re-activate `.\.venv\Scripts\Activate.ps1`.
+### 3. Browser CORS Policy Block (`No 'Access-Control-Allow-Origin' header`)
+- **Symptoms**: Frontend fails to fetch data from `http://127.0.0.1:8000`.
+- **Cause**: The browser origin is not included in the backend allowlist.
+- **Fix**: Check `PLAYERDNA_CORS_ORIGINS` in `.env`. Ensure it includes the exact browser origin (e.g. `http://localhost:5173` and `http://127.0.0.1:5173`) with no trailing slashes or wildcards.
 
-### 4. CORS Errors in Browser (`No 'Access-Control-Allow-Origin' header is present`)
-- **Cause**: The frontend is running on an origin not listed in `PLAYERDNA_CORS_ORIGINS`.
-- **Solution**:
-  - Check the browser console to identify the exact origin (e.g., `http://localhost:5173` vs `http://127.0.0.1:5173`).
-  - Add the exact origin to `PLAYERDNA_CORS_ORIGINS` in `.env`.
-  - Do not use wildcards (`*`); wildcards are explicitly rejected for security.
+### 4. Stockfish Engine Not Found
+- **Symptoms**: Health check `http://127.0.0.1:8000/api/health` returns `"stockfish_available": false` or running `python test_stockfish.py` outputs `Stockfish was not found`.
+- **Fix**: Download Stockfish from [stockfishchess.org](https://stockfishchess.org/). Extract the `.exe` file and either place it on your system `PATH` or set `STOCKFISH_PATH` in `.env`.
 
-### 5. `Stockfish was not found. Set STOCKFISH_PATH or add stockfish to PATH.`
-- **Cause**: Stockfish is not installed or cannot be resolved by Python.
-- **Solution**:
-  - Download the official Stockfish Windows binary from [stockfishchess.org](https://stockfishchess.org/).
-  - Set `STOCKFISH_PATH=C:\path\to\stockfish.exe` in `.env` (or add its folder to your system `PATH`).
-  - Verify with the health endpoint: `GET http://127.0.0.1:8000/api/health` should return `"stockfish_available": true`.
-  - You can also run the quick smoke test: `python test_stockfish.py`.
+### 5. Node Engine Version Warning
+- **Symptoms**: Warnings during `npm install` about unsupported Node engine version.
+- **Fix**: Ensure your installed Node.js version is `>= 20.19.0` by running `node -v`. Download the latest LTS release from [nodejs.org](https://nodejs.org/) if needed.
 
-### 6. Node Version Incompatibility
-- **Cause**: Node.js version is below `20.19.0`.
-- **Solution**: Run `node -v`. If below 20.19.0, install an updated LTS release of Node.js from [nodejs.org](https://nodejs.org/).
-
-### 7. Files That Must Never Be Committed
-Always verify with `git status` that private and generated directories remain untracked:
-- `.env` (contains sensitive passwords and local paths)
+### 6. Untracked Files and Git Hygiene
+Always run `git status` to ensure private credentials and runtime directories remain untracked:
+- `.env` (contains local database password)
 - `.venv/` (Python virtual environment)
-- `frontend/node_modules/` (Node packages)
-- `frontend/dist/` (build artifacts)
+- `frontend/node_modules/` (Node dependencies)
+- `frontend/dist/` (compiled frontend assets)
